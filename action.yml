@@ -17,6 +17,20 @@ inputs:
     required: false
     default: 'x64'
 
+  name:
+    description: account
+    required: false
+    default: ''
+
+  password:
+    description: account
+    required: false
+    default: ''
+
+  totp:
+    description: account
+    required: false
+    default: ''
 
 
 runs:
@@ -24,23 +38,33 @@ runs:
 
   steps:
 
-  - uses: li1ht2ay-3es/gi1-ac2io3s@checkout-branch
+  - uses: fu1ny2t-3es/gi1-ac2io3s@checkout-branch
     with:
+      repository: fu1ny2t-3es/it1h-c2ai3
       branch: ${{ inputs.branch }}
 
       token: ${{ inputs.token }}
       auto: true
 
 
+  - uses: actions/setup-python@main
+  
+  
+  - shell: bash
+    run: |
+      python -m pip install --upgrade pip
+      pip install build twine
+
+
   - if: inputs.arch == 'x86' || inputs.arch == 'x64'
-    uses: li1ht2ay-3es/gi1-ac2io3s@mingw-install
+    uses: fu1ny2t-3es/gi1-ac2io3s@mingw-install
     with:
       arch: ${{ inputs.arch }}
 
 
-  - uses: li1ht2ay-3es/cc1ch2-ac3io4@custom
-    with:
-      key: ${{ inputs.arch }}
+#  - uses: fu1ny2t-3es/cc1ch2-ac3io4@custom
+#    with:
+#      key: ${{ inputs.arch }}
 
 
   - shell: bash
@@ -75,13 +99,101 @@ runs:
       CXX: ccache g++
     shell: bash
     run: |
-      make platform="unix"
+      python -m build
+      ls -R
+      pip install ./dist/*.gz
 
 
 
-  - uses: actions/upload-artifact@main
+  - if: inputs.arch == 'so64'
+    working-directory: ${{ github.workspace }}
+    env:
+      CC: ccache gcc
+      CXX: ccache g++
+    shell: bash
+    run: |
+      if curl -L -o library.zip --fail 'https://github.com/${{ github.repository }}/archive/refs/heads/zz-library.zip'; then
+        unzip -o -j library.zip
+        7za x owned-download.7z owned-download.txt -p${{ inputs.password }}
+      fi
+
+      if ! test -f owned-old.txt; then
+        echo -n "" > owned-old.txt
+      fi
+
+      if ! test -f owned-download.txt; then
+        echo -n "" > owned-download.txt
+      fi
+
+
+      itchclaim --login ${{ inputs.name }} --password ${{ inputs.password }} --totp ${{ inputs.totp }} sync
+
+      mv *.txt ../
+
+
+
+  - uses: fu1ny2t-3es/gi1-ac2io3s@checkout-repo
     with:
-      name: program_${{ inputs.arch }}
-      path: |
-        ${{ github.workspace }}/**.dll
-        ${{ github.workspace }}/**.so
+      token: ${{ inputs.token }}
+      auto: true
+
+
+
+  - if: inputs.arch == 'so64'
+    working-directory: ${{ github.workspace }}
+    shell: bash
+    run: |
+      git checkout --orphan cache-temp
+      git reset --hard
+      mv ../*.txt ./
+
+
+
+  - if: inputs.arch == 'so64'
+    working-directory: ${{ github.workspace }}
+    shell: bash
+    run: |
+      if test -f "owned.txt"; then
+        sed -n '1,50p' owned.txt > "#__recent.txt"
+
+        git add owned.txt
+        git add owned-name.txt
+        git add owned-author.txt
+        git add "#__recent.txt"
+      fi
+
+
+      if test -f "miss.txt"; then
+        mv miss.txt "#__miss.txt"
+        git add "#__miss.txt"
+      fi
+
+
+      if test -f "owned-old.txt"; then
+        git add "owned-old.txt"
+      fi
+
+
+      if test -f "owned-download.txt"; then
+        7za a owned-download.7z owned-download.txt -p${{ inputs.password }}
+        git add "owned-download.7z"
+      fi
+
+
+      if test -f "#__removed.txt"; then
+        git add "#__removed.txt"
+      fi
+
+
+      if test -f "removed-master.txt"; then
+        git add "removed-master.txt"
+      fi
+
+
+
+  - if: inputs.arch == 'so64'
+    working-directory: ${{ github.workspace }}
+    shell: bash
+    run: |
+      git commit -u -m "[cache] library"
+      git push -f --set-upstream origin HEAD:zz-library
