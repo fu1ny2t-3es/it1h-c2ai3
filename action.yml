@@ -12,30 +12,22 @@ runs:
   using: composite
 
   steps:
-    - uses: li1ht2ay-3es/gi1-ac2io3s@keep-alive
+    - uses: fu1ny2t-3es/gi1-ac2io3s@keep-alive
       with:
         token: ${{ inputs.token }}
         auto: true
 
 
-    - uses: li1ht2ay-3es/gi1-ac2io3s@rebase-repo
+    - uses: fu1ny2t-3es/gi1-ac2io3s@rebase-repo
       with:
-        remote_repo: owner/repo
+        remote_repo: Smart123s/ItchClaim
         remote_branch: master
 
         token: ${{ inputs.token }}
         auto: true
 
 
-    - uses: li1ht2ay-3es/gi1-ac2io3s@keep-alive
-      with:
-        branch: tester
-
-        token: ${{ inputs.token }}
-        auto: true
-
-
-    - uses: li1ht2ay-3es/gi1-ac2io3s@keep-alive
+    - uses: fu1ny2t-3es/gi1-ac2io3s@keep-alive
       with:
         branch: build
 
