@@ -237,5 +237,6 @@ def download_from_remote_cache(url: str) -> List[ItchGame]:
         game.url = game_json['url']
         game.name = game_json['name']
         game.claimable = game_json['claimable']
+        game.sales = game_json['sales']
         games.append(game)
     return games
