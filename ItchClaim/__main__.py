@@ -1430,7 +1430,7 @@ class ItchClaim:
         if len(removed_list) > 0:
             with open('#__removed.txt', 'w') as myfile:
                 for game_url in sorted(removed_list):
-                    r = self._send_web('get', game_url)
+                    r = self._send_web('user_get', game_url)
                     if ((self._substr(r.text, 0, 'alt="Page not found"', '>'))[1]) != -1:
                         print(game_url, file=myfile)  # Python 3.x
                         print('Delisted ' + game_url)
