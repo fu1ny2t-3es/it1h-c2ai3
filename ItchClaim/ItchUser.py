@@ -200,7 +200,9 @@ class ItchUser:
 
             if r.status_code == 200:  # OK
                 break
-            if r.status_code == 301:  # Redirect
+            if r.status_code == 301:  # Redirect permanent
+                break
+            if r.status_code == 302:  # Redirect temporary
                 break
             if r.status_code == 404:  # Not found
                 break
