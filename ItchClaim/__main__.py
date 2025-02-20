@@ -309,7 +309,9 @@ class ItchClaim:
 
             if r.status_code == 200:  # OK
                 break
-            if r.status_code == 301:  # Redirect
+            if r.status_code == 301:  # Redirect permanent
+                break
+            if r.status_code == 302:  # Redirect temporary
                 break
             if r.status_code == 404:  # Not found
                 break
@@ -1377,14 +1379,14 @@ class ItchClaim:
 
 
         self.auto_rating()
-        self._claim_free()
+        # self._claim_free()
 
 
-        self.user.reload_owned_games()
-        self.user.save_session()
+        # self.user.reload_owned_games()
+        # self.user.save_session()
 
-        for game in [owned_game.url for owned_game in self.user.owned_games]:
-            self.owned_list.add(game)
+        # for game in [owned_game.url for owned_game in self.user.owned_games]:
+        #    self.owned_list.add(game)
 
 
         removed_list = set()
@@ -1428,7 +1430,10 @@ class ItchClaim:
         if len(removed_list) > 0:
             with open('#__removed.txt', 'w') as myfile:
                 for game_url in sorted(removed_list):
-                    print(game_url, file=myfile)  # Python 3.x
+                    r = self._send_web('get', game_url + '/data.json', False)
+                    if r.status_code != 200 and r.status_code != 301 and r.status_code != 302:
+                        print(game_url, file=myfile)  # Python 3.x
+                        print('Delisted ' + game_url)
 
         elif os.path.exists('#__removed.txt'):
             os.remove('#__removed.txt')
