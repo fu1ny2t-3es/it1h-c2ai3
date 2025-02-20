@@ -221,12 +221,12 @@ class ItchClaim:
 
 
 
-    def _login(self):
+    def _login(self, reload = True):
         if self.user is None:
             print('You must be logged in', flush=True)
             return
 
-        if len(self.user.owned_games) == 0:
+        if reload == True and len(self.user.owned_games) == 0:
             print('User\'s library not found in cache. Downloading it now', flush=True)
             self.user.reload_owned_games()
             self.user.save_session()
@@ -1430,8 +1430,8 @@ class ItchClaim:
         if len(removed_list) > 0:
             with open('#__removed.txt', 'w') as myfile:
                 for game_url in sorted(removed_list):
-                    r = self._send_web('get', game_url + '/data.json', False)
-                    if r.status_code != 200 and r.status_code != 301 and r.status_code != 302:
+                    r = self._send_web('get', game_url)
+                    if ((self._substr(r.text, 0, 'alt="Page not found"', '>'))[1]) != -1:
                         print(game_url, file=myfile)  # Python 3.x
                         print('Delisted ' + game_url)
 
