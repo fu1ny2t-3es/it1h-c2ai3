@@ -621,6 +621,11 @@ class ItchClaim:
         self._login()
 
 
+        miss_log = []  # not for searching
+        future_log = []
+        sales_log = []
+
+
         if scrape_page == -1:
             try:
                 with open("sale-stop.txt", 'r') as myfile:
@@ -636,12 +641,28 @@ class ItchClaim:
             scrape_limit = int(scrape_page) + int(scrape_step)
 
 
-        miss_log = []  # not for searching
-        future_log = []
-        sales_log = []
-
-
         print(f'Scraping {scrape_page} ...', flush=True)
+
+
+        with open('sale-active.txt', 'w') as myfile:
+            myfile.close()
+
+
+        self._scrape_sales()
+
+        try:
+            for url in self.active_sales:
+                if url not in self.owned_list:
+                    game: ItchGame = ItchGame.from_api(url)
+                    self.user.claim_game(game)
+
+                    if url not in self.owned_list and url not in self.user.owned_games:
+                        miss_log.append(url)
+                        self._dump_line('sale-active.txt', url)
+
+        except Exception as err:
+            print('Failure while checking ' + url + ' = ' + str(err), flush=True)
+
 
 
         page_count = 0
@@ -730,16 +751,17 @@ class ItchClaim:
                     #    sales_log.append(url)
 
 
-                    if url not in self.owned_list:
+                    if url not in self.owned_list and url not in miss_log:
                         if future_sale:
                             print('Must claim later ' + url, flush=True)
 
                             if debug_miss == 0:
                                 debug_miss = 1
                                 future_log.append(sale_url)
+                                self._dump_line('sale-future.txt', sale_url)
 
-                            future_log.append(url)
-                            self._dump_line('sale-future.txt', url)
+                            # future_log.append(url)
+                            # self._dump_line('sale-future.txt', url)
 
                         else:
                             game: ItchGame = ItchGame.from_api(url)
@@ -748,7 +770,7 @@ class ItchClaim:
                             if url not in self.owned_list and url not in self.user.owned_games:
                                 if debug_miss == 0:
                                     debug_miss = 1
-                                    miss_log.append(sale_url)
+                                    # miss_log.append(sale_url)
 
                                 miss_log.append(url)
                                 self._dump_line('sale-miss.txt', url)
@@ -759,23 +781,6 @@ class ItchClaim:
 
         with open("sale-stop.txt", 'w') as myfile:
             print(scrape_page, file=myfile)  # Python 3.x
-
-
-
-        self._scrape_sales()
-
-        try:
-            for url in self.active_sales:
-                if url not in self.owned_list:
-                    game: ItchGame = ItchGame.from_api(url)
-                    self.user.claim_game(game)
-
-                    if url not in self.owned_list and url not in self.user.owned_games:
-                        miss_log.append(url)
-                        self._dump_line('sale-miss.txt', url)
-
-        except Exception as err:
-            print('Failure while checking ' + url + ' = ' + str(err), flush=True)
 
 
 
