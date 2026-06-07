@@ -37,6 +37,13 @@ from .ItchUser import ItchUser
 from .web import generate_web
 from .CfWrapper import CfWrapper
 
+import json
+import requests
+from bs4 import BeautifulSoup
+from pathlib import Path
+from datetime import datetime
+from requests.exceptions import SSLError
+
 
 # pylint: disable=missing-class-docstring
 class ItchClaim:
@@ -271,6 +278,392 @@ class ItchClaim:
                 totp = os.getenv('ITCH_TOTP')
             self.user.login(password, totp)
             print(f'Logged in as {username}')
+
+
+    def _send_web(self, type: str, url: str, redirect = True, payload = None):
+        timer = 10
+        sleep_time = 10
+        verify_ssl = True
+
+        count = 0
+        while True:
+            if count >= (5 * 60 * 1000):  # 5 min * 60 sec * 1000 ms
+                exit(0)
+
+            count += 50 + sleep_time
+
+            try:
+                if type == 'get':
+                    r = requests.get(url, data=payload, timeout=timer, allow_redirects=redirect, verify=verify_ssl)
+                if type == 'post':
+                    r = requests.post(url, data=payload, timeout=timer, allow_redirects=redirect, verify=verify_ssl)
+
+
+                if type == 'user_get':
+                    r = self.user.s.get(url, data=payload, timeout=timer, allow_redirects=redirect, verify=verify_ssl)
+                if type == 'user_post':
+                    r = self.user.s.post(url, data=payload, timeout=timer, allow_redirects=redirect, verify=verify_ssl)
+
+
+                r.encoding = 'utf-8'
+
+                if r.status_code == 200:  # OK
+                    break
+
+                if r.status_code == 301:  # Redirect permanent
+                    break
+
+                if r.status_code == 302:  # Redirect temporary
+                    break
+
+                if r.status_code == 403:  # Forbidden
+                    break
+
+                if r.status_code == 404:  # Not found
+                    break
+
+                if r.status_code == 451:  # Illegal content
+                    break
+
+
+                if (count % 100) == 0:
+                    print(r.status_code, flush=True);
+
+                sleep(sleep_time/1000.0)
+            
+            except SSLError as err:
+                print(f"SSL Error: {err}", flush=True)
+                verify_ssl=False
+
+            except requests.RequestException as err:
+                print(err, flush=True)
+                sleep(sleep_time/1000.0)
+                # pass
+
+        return r
+
+
+    def _claim(self, url):
+        try:
+            while True:
+                r = self._send_web('user_post', url)
+
+                if r.headers["content-type"].strip().startswith("application/json"):
+                    break
+
+
+            download_url = json.loads(r.text)
+            if 'url' not in download_url:
+                return
+
+            download_url = download_url['url']
+            r = self._send_web('user_get', download_url)
+
+            soup = BeautifulSoup(r.text, 'html.parser')
+
+            claim_box = soup.find('div', class_='claim_to_download_box warning_box')
+            if claim_box == None:
+                return
+
+            claim_url = claim_box.find('form')
+            if claim_url == None:
+                return
+
+            claim_url = claim_url['action']
+            if claim_url == None:
+                return
+
+            r = self._send_web('user_post', claim_url, True, {'csrf_token': self.user.s.csrf_token})
+
+        except Exception as err:
+            print('[_claim] Failure while checking ' + url + ' = ' + str(err), flush=True)
+
+
+    def _claim_reward(self, url):
+        try:
+            while True:
+                r = self._send_web('get', url + '/data.json')
+                
+                if r.headers["content-type"].strip().startswith("application/json"):
+                    break
+
+
+            dat = json.loads(r.text)
+
+
+            if 'rewards' not in dat:
+                return
+
+
+            for item in dat['rewards']:
+                # print(item, flush=True)
+
+                idx = 0
+                while item['price'][idx].isdigit() == False:
+                    idx += 1
+
+
+                if item['price'][idx:] != '0.00':
+                    continue
+
+                if item['available'] != True:
+                    continue
+
+                self._claim(url + '/download_url?csrf_token=' + self.user.s.csrf_token + '&reward_id=' + str(item['id']))
+
+        except Exception as err:
+            print('[_claim_reward] Failure while checking ' + url + ' = ' + str(err), flush=True)
+
+
+    def claim(self):
+        with open('miss.txt', 'r') as myfile:
+            for url in myfile.read().splitlines():
+                self._claim_reward(url)
+                self._claim(url + '/download_url?csrf_token=' + self.user.s.csrf_token)
+
+
+    def rating(self):
+        rated_games = set()
+
+
+        print('Reviews', flush=True)
+        url = 'https://itch.io/library/rated?json'
+
+        page_num = 1
+        try:
+            while True:
+                # print(url, flush=True)
+
+                while True:
+                    r = self._send_web('user_get', url)
+
+                    if r.status_code == 404:
+                        return -1
+
+                    if r.headers["content-type"].strip().startswith("application/json"):
+                        break
+
+
+                dat = json.loads(r.text)
+
+                if 'game_ratings' not in dat:
+                    break
+
+                extra = 0
+                for item in dat['game_ratings']:
+                    # print(item, flush=True)
+                    rated_games.add(item['game']['id'])
+                    extra += 1
+
+                # print('Reviews page #' + str(page_num) + ': added ' + str(extra) + ' games (total: ' + str(len(rated_games)) + ')', flush=True)
+
+                if 'next_page' not in dat:
+                    break
+
+                next_url = str(dat['next_page']).replace("'", '"')
+                url = 'https://itch.io/library/rated?json&next_page=' + next_url
+                page_num += 1
+
+        except Exception as err:
+            print('Failure to get reviews ' + url + ' = ' + str(err), flush=True)
+
+
+        print('Things to rate', flush=True)
+        url = 'https://itch.io/library/things-to-rate?json'
+
+        page_num = 1
+        try:
+            while True:
+                # print(url, flush=True)
+
+                while True:
+                    r = self._send_web('user_get', url)
+
+                    if r.status_code == 404:
+                        return -1
+
+                    if r.headers["content-type"].strip().startswith("application/json"):
+                        break
+
+
+                dat = json.loads(r.text)
+
+                if 'games' not in dat:
+                    break
+
+                extra = 0
+                for item in dat['games']:
+                    try:
+                        game_id = item['id']
+                        game_url = item['url']
+
+                        if game_id in rated_games:
+                            continue
+
+                        print('Rating ' + game_url, flush=True)
+                        rated_games.add(game_id)
+
+                        data = {
+                            'csrf_token': self.user.s.csrf_token,
+                            'game_rating': '5'
+                        }
+
+                        r = self._send_web('user_post', game_url + '/rate?source=game&game_id=' + str(game_id), True, data)
+                        if 'errors' in r.text:
+                            continue
+
+                        # print(r.text)
+                        # print('Success!', flush=True)
+                        # return
+
+                    except Exception as err:
+                        print('Failure to rate ' + game_url + ' = ' + str(err), flush=True)
+
+                    # print(item, flush=True)
+                    rated_games.add(item['id'])
+                    extra += 1
+
+                # print('Things to rate page #' + str(page_num) + ': added ' + str(extra) + ' games (total: ' + str(len(rated_games)) + ')', flush=True)
+
+                if 'next_page' not in dat:
+                    break
+
+                next_url = str(dat['next_page']).replace("'", '"')
+                url = 'https://itch.io/library/things-to-rate?json&next_page=' + next_url
+                page_num += 1
+
+        except Exception as err:
+            print('Failure to get things to rate ' + url + ' = ' + str(err), flush=True)
+
+
+        print('Owned', flush=True)
+        page = 1
+
+        while True:
+            # print(f"owned page {page}", flush=True);
+
+            while True:
+                try:
+                    # r = self.s.get(f"https://itch.io/my-purchases?page={page}&format=json", timeout=timer)
+                    r = self._send_web('get', f"https://api.itch.io/profile/owned-keys?api_key={self.api_token}&page={page}")
+
+                    if r.status_code == 200 and r.headers["content-type"].strip().startswith("application/json"):  # OK
+                        break
+
+                except:
+                    pass
+
+            r.encoding = 'utf-8'
+
+
+            if len(json.loads(r.text)['owned_keys']) == 0:
+                break
+
+
+            for item in json.loads(r.text)['owned_keys']:
+                game_id = item['game_id']
+                game_url = item['game']['url']
+
+                try:
+                    if game_id in rated_games:
+                        continue
+
+                    print('Rating ' + game_url, flush=True)
+                    rated_games.add(game_id)
+
+                    data = {
+                        'csrf_token': self.user.s.csrf_token,
+                        'game_rating': '5'
+                    }
+
+                    r = self._send_web('user_post', game_url + '/rate?source=game&game_id=' + str(game_id), True, data)
+                    if 'errors' in r.text:
+                        continue
+
+                    # print(r.text)
+                    # print('Success!', flush=True)
+                    # return
+
+                except Exception as err:
+                    print('Failure to rate ' + game_url + ' = ' + str(err), flush=True)
+
+            page += 1
+
+
+    def login(self,
+                username: str = None,
+                password: str = None,
+                totp: str = None) -> ItchUser:
+        """Load session from disk if exists, or use password otherwise.
+
+        Args:
+            username (str): The username or email address of the user
+            password (str): The password of the user
+            totp (str): The 2FA code of the user
+                Either the 6 digit code, or the secret used to generate the code
+        
+        Returns:
+            ItchUser: a logged in ItchUser instance
+        """
+
+        if not isinstance(username, str):
+            username = input('Enter username: ')
+
+        self.user = ItchUser(username)
+
+        # Try loading password from environment variables if not provided as command line argument
+        if password is None:
+            password = os.getenv('ITCH_PASSWORD')
+        # Try loading TOTP from environment variables if not provided as command line argument
+        if totp is None:
+            totp = os.getenv('ITCH_TOTP')
+        self.user.login(password, totp)
+        print(f'Logged in as {username}')
+
+
+    def __init__(self,
+                version: bool = False,
+                login: str = None,
+                password: str = None,
+                totp: str = None,
+                api_token: str = None,
+                flaresolverr_log_level: str = 'ERROR',
+                flaresolverr_max_timeout: int = 120):
+        """Automatically claim free games from itch.io
+
+        Args:
+            username (str): The username or email address of the user
+            password (str): The password of the user
+            totp (str): The 2FA code of the user
+                Either the 6 digit code, or the secret used to generate the code
+            flaresolverr_log_level (str): The logging level of FlareSolverr
+                Default is 'ERROR'. Other options are: 'DEBUG', 'INFO', 'WARNING'
+            flaresolverr_max_timeout (int): The maximum timeout for FlareSolverr in seconds
+                Default is 120
+        """
+
+        # Set up FlareSolverr logging
+        logging.getLogger("flaresolverr").setLevel(flaresolverr_log_level)
+        flaresolverr_logger = logging.getLogger("flaresolverr")
+        flaresolverr_logger.setLevel(flaresolverr_log_level)
+        ch = logging.StreamHandler(sys.stdout)
+        ch.setLevel(flaresolverr_log_level)
+        flaresolverr_logger.addHandler(ch)
+        
+        # CfWrapper is a singleton, so this sets the max timeout for all instances
+        CfWrapper().max_timeout = flaresolverr_max_timeout
+
+        if version:
+            self.version()
+        # Try loading username from environment variables if not provided as command line argument
+        if login is None and os.getenv('ITCH_USERNAME') is not None:
+            login = os.getenv('ITCH_USERNAME')
+        if login is not None:
+            self.login(login, password, totp)
+        else:
+            self.user = None
+        self.api_token = api_token
+
 
 # pylint: disable=missing-function-docstring
 def main():

@@ -219,3 +219,35 @@ class ItchUser:
             return os.path.join(tempfile.gettempdir(), ".itchclaim", "users")
         # on Unix, use ~/.config/instaloader
         return os.path.join(os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "itchclaim", "users")
+
+    def send_top(self, totp: str, url: str) -> None:
+        totp_secret = None
+        if len(totp) != 6:
+            totp_secret = totp
+            totp = pyotp.TOTP(totp).now()
+        data = {
+            'csrf_token': self.s.csrf_token,
+            'userid': self.user_id,
+            'code': int(totp),
+        }
+        r = self.s.post(url, params=data)
+        r.encoding = 'utf-8'
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        errors_div = soup.find('div', class_='form_errors')
+        if errors_div:
+            return self.send_top(totp_secret, r.url)
+            totp_new = pyotp.TOTP(totp_secret).now()
+            if totp_secret and totp_new != totp:
+               print(f'TOTP code changed (probably the 30 seconds have elapsed while sending it). Attempting with new code.')
+               return self.send_top(totp_secret, r.url)
+            print(f'Error while logging in: ' + errors_div.find('li').text)
+            exit(1)
+
+    def save_session(self):
+        """Save session to disk"""
+        return
+
+    def load_session(self):
+        """Load a user's session from disk"""
+        return
