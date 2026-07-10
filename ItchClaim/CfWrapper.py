@@ -56,7 +56,7 @@ class CfWrapper:
             return
 
         self.session = requests.Session()
-        self.max_timeout = 120
+        self.max_timeout = 900
 
         # Retry failed requests to handle transient network issues
         retry_strategy = Retry(
