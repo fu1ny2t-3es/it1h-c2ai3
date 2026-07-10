@@ -53,7 +53,7 @@ class ItchClaim:
                 password: str = None,
                 totp: str = None,
                 flaresolverr_log_level: str = 'ERROR',
-                flaresolverr_max_timeout: int = 120):
+                flaresolverr_max_timeout: int = 900):
         """Automatically claim free games from itch.io
 
         Args:
