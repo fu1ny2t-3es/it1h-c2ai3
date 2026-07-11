@@ -33,7 +33,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from requests.exceptions import SSLError
 from urllib.parse import urlparse
 from urllib3.exceptions import InsecureRequestWarning
