@@ -39,6 +39,9 @@ from urllib.parse import urlparse
 from urllib3.exceptions import InsecureRequestWarning
 
 
+start_time = datetime.now()
+
+
 class GameName:
     def __init__(self,
                 url: str = None,
@@ -825,6 +828,9 @@ class ItchCustom:
 
         for url in self.scrape_list:
             try:
+                if datetime.now() - start_time >= timedelta(hours=4):
+                    break
+
                 if url not in self.checked_list:
                     self._scrape_profile(url)
 
@@ -1574,11 +1580,9 @@ class ItchCustom:
 
 # pylint: disable=missing-function-docstring
 def main():
-    old = datetime.now()
-
     Fire(ItchCustom)
 
-    print(old)
+    print(start_time)
     print(datetime.now())
 
 
