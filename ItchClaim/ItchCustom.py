@@ -36,6 +36,7 @@ from pathlib import Path
 from datetime import datetime
 from requests.exceptions import SSLError
 from urllib.parse import urlparse
+from urllib3.exceptions import InsecureRequestWarning
 
 
 class GameName:
@@ -58,6 +59,8 @@ class ItchCustom:
         self.s = requests.Session()
         self.user = None
         self.api_token = api_token
+
+        requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 
 
@@ -118,14 +121,14 @@ class ItchCustom:
             try:
                 if type == 'get':
                     # r = self.s.get(url, timeout=timer, allow_redirects=redirect, verify=verify_ssl)
-                    r = requests.get(url, timeout=timer, allow_redirects=redirect, verify=verify_ssl)
+                    r = requests.get(url, timeout=timer, allow_redirects=redirect, verify=False)
 
                 elif type == 'cf_get':
                     headers = { 'User-Agent': self.cf_agent }
                     cookies = { 'cf_clearance': self.cf_token }
                     print(cookies)
                     print(headers)
-                    r = requests.get(url, timeout=timer, headers=headers, cookies=cookies, allow_redirects=redirect, verify=verify_ssl)
+                    r = requests.get(url, timeout=timer, headers=headers, cookies=cookies, allow_redirects=redirect, verify=True)
                     print(r.status_code)
 
 
