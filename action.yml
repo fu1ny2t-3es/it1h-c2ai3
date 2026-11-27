@@ -12,13 +12,13 @@ runs:
   using: composite
 
   steps:
-    - uses: fu1ny2t-3es/gi1-ac2io3s@rebase-repo
-      with:
-        remote_repo: smart123s/ItchClaim
-        remote_branch: master
+    # - uses: fu1ny2t-3es/gi1-ac2io3s@rebase-repo
+    #   with:
+    #     remote_repo: smart123s/ItchClaim
+    #     remote_branch: master
 
-        token: ${{ inputs.token }}
-        auto: true
+    #     token: ${{ inputs.token }}
+    #     auto: true
         
     - uses: fu1ny2t-3es/gi1-ac2io3s@keep-alive
       with:
