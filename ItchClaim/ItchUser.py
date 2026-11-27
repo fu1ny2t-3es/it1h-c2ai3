@@ -229,6 +229,7 @@ class ItchUser:
             totp_secret = totp
             # totp = pyotp.TOTP(totp).now()
             totp = LegacyTOTP(totp)
+            totp = totp.now()
         data = {
             'csrf_token': self.s.csrf_token,
             'userid': self.user_id,
