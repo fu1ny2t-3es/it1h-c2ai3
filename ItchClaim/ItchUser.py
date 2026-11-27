@@ -32,6 +32,9 @@ from bs4 import BeautifulSoup
 from .CfWrapper import CfWrapper
 from .ItchGame import ItchGame
 
+class LegacyTOTP(pyotp.TOTP):
+    min_secret_length_bits = 0  # Bypasses the 112-bit requirement
+
 class ItchUser:
     def __init__(self, username):
         self.s = CfWrapper()
@@ -224,7 +227,8 @@ class ItchUser:
         totp_secret = None
         if len(totp) != 6:
             totp_secret = totp
-            totp = pyotp.TOTP(totp).now()
+            # totp = pyotp.TOTP(totp).now()
+            totp = LegacyTOTP(totp)
         data = {
             'csrf_token': self.s.csrf_token,
             'userid': self.user_id,
